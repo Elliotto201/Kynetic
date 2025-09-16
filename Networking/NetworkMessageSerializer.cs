@@ -39,7 +39,7 @@ namespace Networking
             using var ms = new MemoryStream(bytes);
             using var br = new BinaryReader(ms);
 
-            packet.PacketId = br.ReadUInt16();
+            packet.PacketId = br.ReadUInt32();
             packet.PacketFlags = (PacketFlag)br.ReadByte();
             packet.PacketType = (PacketType)br.ReadByte();
 

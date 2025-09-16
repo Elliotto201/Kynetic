@@ -15,6 +15,7 @@ namespace Networking
         //-----Server-----
         private Dictionary<IPEndPoint, uint> clientEndpointToClientId;
         private Dictionary<uint, IPEndPoint> clientIdToClientEndpoint;
+        public List<NetworkClient> ConnectedClients { get; private set; }
 
         //-----Client-----
         private IPEndPoint ServerEndPoint;
@@ -27,6 +28,7 @@ namespace Networking
 
             clientEndpointToClientId = new();
             clientIdToClientEndpoint = new();
+            ConnectedClients = new();
         }
 
         public void StartClient(int localPort, IPEndPoint serverEndPoint)
@@ -50,30 +52,50 @@ namespace Networking
             await transport.SendAsync(ServerEndPoint, data);
         }
 
-        public async Task<(uint clientId, byte[] data)> ReceiveServerAsync()
+        public async Task<(uint clientId, NetworkMessage data)> ReceiveServerAsync()
         {
             while (true)
             {
-                var data = await transport.ReceiveAsync();
+                try
+                {
+                    var data = await transport.ReceiveAsync();
+                    var message = NetworkMessageSerializer.DeserializeMessage(data.data);
 
-                if (clientEndpointToClientId.TryGetValue(data.endPoint, out uint clientId))
-                {
-                    return (clientId, data.data);
+                    if (clientEndpointToClientId.TryGetValue(data.endPoint, out uint clientId))
+                    {
+                        if (message.PacketType == PacketType.ClientDisconnectRequest)
+                        {
+                            clientEndpointToClientId.Remove(data.endPoint);
+                            clientIdToClientEndpoint.Remove(clientId);
+
+                            ConnectedClients.RemoveAll(t => CompareIpEndPoint(data.endPoint, t.IpEndPoint));
+                        }
+                        else
+                        {
+                            return (clientId, message);
+                        }
+                    }
+                    else
+                    {
+                        HandleUnknownClientServer(data);
+                    }
                 }
-                else
+                catch(Exception ex)
                 {
-                    TryAcceptClientServer(data);
+
                 }
             }
         }
 
-        public async Task<byte[]> ReceiveClientAsync()
+        public async Task<NetworkMessage> ReceiveClientAsync()
         {
             while (true)
             {
                 var receiveData = await transport.ReceiveAsync();
-                if (IpAreEqual(ServerEndPoint, receiveData.endPoint))
-                    return receiveData.data;
+                var receiveMessage = NetworkMessageSerializer.DeserializeMessage(receiveData.data);
+
+                if (CompareIpEndPoint(ServerEndPoint, receiveData.endPoint))
+                    return receiveMessage;
             }
         }
 
@@ -91,12 +113,12 @@ namespace Networking
             transport.Stop();
         }
 
-        private bool IpAreEqual(IPEndPoint a, IPEndPoint b)
+        private bool CompareIpEndPoint(IPEndPoint a, IPEndPoint b)
         {
             return a.Address.Equals(b.Address) && a.Port == b.Port;
         }
 
-        private void TryAcceptClientServer((IPEndPoint endPoint, byte[] data) data)
+        private void HandleUnknownClientServer((IPEndPoint endPoint, byte[] data) data)
         {
             var message = NetworkMessageSerializer.DeserializeMessage(data.data);
 
@@ -108,6 +130,7 @@ namespace Networking
 
                     clientEndpointToClientId.Add(data.endPoint, id);
                     clientIdToClientEndpoint.Add(id, data.endPoint);
+                    ConnectedClients.Add(new NetworkClient(data.endPoint, id));
                 }
             }
         }

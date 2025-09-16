@@ -14,10 +14,10 @@ namespace Networking
         private readonly NetworkSender Sender;
 
         private readonly Queue<NetworkMessage> orderedQueue = new();
-        private readonly SortedDictionary<ushort, NetworkMessage> orderedBuffer = new();
-        private ushort expectedOrderedId = 0;
+        private readonly SortedDictionary<uint, NetworkMessage> orderedBuffer = new();
+        private uint expectedOrderedId = 0;
 
-        private readonly Dictionary<ushort, TaskCompletionSource<bool>> awaitingAcks = new();
+        private readonly Dictionary<uint, TaskCompletionSource<bool>> awaitingAcks = new();
         private readonly object queueLock = new();
         private readonly object ackLock = new();
 
@@ -97,8 +97,7 @@ namespace Networking
         {
             while (true)
             {
-                var data = await Sender.ReceiveClientAsync();
-                var message = new NetworkMessage { Payload = data };
+                var message = await Sender.ReceiveClientAsync();
 
                 bool reliable = message.PacketFlags.HasFlag(PacketFlag.Reliable);
                 bool ordered = message.PacketFlags.HasFlag(PacketFlag.Ordered);

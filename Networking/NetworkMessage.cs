@@ -8,7 +8,7 @@ namespace Networking
 {
     internal struct NetworkMessage
     {
-        public ushort PacketId;
+        public uint PacketId;
         public PacketFlag PacketFlags;
         public PacketType PacketType;
 
