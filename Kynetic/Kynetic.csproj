@@ -8,9 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\GameCore\GameCore.csproj" />
-    <ProjectReference Include="..\Networking\Networking.csproj" />
-    <ProjectReference Include="..\Rendering\Rendering.csproj" />
+    <ProjectReference Include="..\GameCore\Core.csproj" />
   </ItemGroup>
 
 </Project>

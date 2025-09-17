@@ -8,14 +8,20 @@ namespace Rendering
     {
         private IWindow _window;
         private GL GL;
+        private int currentTick;
+        private float tickAccumulator;
+
+        private const float TickRate = 60f;
+        private const float TickInterval = 1f / TickRate;
 
         public event Action<float> OnFrame;
+        public event Action<int> OnTick;
 
         private Window(IWindow window, GL gl)
         {
             _window = window;
             GL = gl;
-            _window.Render += Render;
+            _window.Render += HandleFrame;
         }
 
         public static Window CreateWindow(string windowTitle, System.Numerics.Vector2 size)
@@ -33,6 +39,7 @@ namespace Rendering
             {
                 gl = GL.GetApi(window);
                 gl.ClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+                gl.Enable(EnableCap.DepthTest);
             };
 
             var _window = new Window(window, gl);
@@ -47,10 +54,24 @@ namespace Rendering
             return GL;
         }
 
-        private void Render(double dt)
+        private void HandleFrame(double dt)
         {
             float actualDt = (float)dt;
             OnFrame?.Invoke(actualDt);
+
+            tickAccumulator += actualDt;
+
+            const int MaxTicksPerFrame = 8;
+            int ticksThisFrame = 0;
+
+            while (tickAccumulator >= TickInterval && ticksThisFrame < MaxTicksPerFrame)
+            {
+                tickAccumulator -= TickInterval;
+                currentTick++;
+                OnTick?.Invoke(currentTick);
+                ticksThisFrame++;
+            }
+
             renderMeshes();
         }
 
@@ -59,9 +80,9 @@ namespace Rendering
             if (GL == null) return;
 
             GL.ClearColor(0.2f, 0.3f, 0.3f, 1);
-            GL.Clear(ClearBufferMask.ColorBufferBit);
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-            foreach(var drawCall in MeshObjectHandler.GetMeshObjects())
+            foreach (var drawCall in MeshObjectHandler.GetMeshObjects())
             {
                 drawCall.Material.Use();
                 drawCall.Material.Render(GL, 0);

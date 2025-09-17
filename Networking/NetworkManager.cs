@@ -18,6 +18,19 @@ namespace Networking
         public static event Action<byte[]> OnMessageClient;
         public static event Action<(uint clientId, byte[] data)> OnMessageServer;
 
+        public static List<Client> NetworkClientList 
+        { 
+            get
+            {
+                if(State != NetworkManagerState.Server)
+                {
+                    throw new Exception($"Tried to access NetworkClients on a non server NetworkManager with state {State}");
+                }
+
+                return Sender.ConnectedClients.Select(t => new Client(t.ClientId)).ToList();
+            } 
+        }
+
         //-----Server-----
         private static Dictionary<uint, NetworkMessageHandler> ServerMessageHandlers;
 
@@ -54,14 +67,14 @@ namespace Networking
             State = NetworkManagerState.Dead;
         }
 
-        public static async void SendMessage(byte[] message)
+        public static async void SendMessageClient(byte[] message)
         {
             if (State != NetworkManagerState.Client) return;
 
             await Sender.SendClientAsync(message);
         }
 
-        public static async void SendMessage(uint clientId, byte[] message)
+        public static async void SendMessageServer(uint clientId, byte[] message)
         {
             if (State != NetworkManagerState.Server) return;
 

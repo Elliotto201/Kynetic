@@ -74,10 +74,5 @@ namespace Rendering
         }
 
         private static float ParseFloat(string s) => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
-
-        public static Mesh LoadMeshFromFbxFileBytes(byte[] data)
-        {
-
-        }
     }
 }

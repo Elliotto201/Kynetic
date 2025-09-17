@@ -4,8 +4,8 @@ namespace Rendering
 {
     public abstract class Material
     {
-        private GL _gl;
-        private uint shaderId;
+        private readonly GL _gl;
+        private readonly uint shaderId;
 
         internal Material(GL gl, string vertSource, string fragSource)
         {
