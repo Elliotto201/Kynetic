@@ -14,6 +14,7 @@ namespace Core
         private static NetworkState State = NetworkState.Dead;
 
         private static HashSet<int> UsedNetworkEntityIds;
+        private static Dictionary<int, NetworkEntity> spawnedEntities = new();
 
         public static void StartServer()
         {
@@ -21,6 +22,7 @@ namespace Core
 
             State = NetworkState.Server;
             UsedNetworkEntityIds = new();
+            NetworkManager.OnMessageServer += OnMessageServer;
         }
 
         public static void StartClient(IPEndPoint server)
@@ -28,11 +30,102 @@ namespace Core
             NetworkManager.StartClient(server);
 
             State = NetworkState.Client;
+            NetworkManager.OnMessageClient += OnMessageClient;
+        }
+
+        private static void OnMessageClient(byte[] data)
+        {
+            try
+            {
+                var message = NetworkMessageSerializer.DeserializeMessage(data);
+
+                if (message.Type == MessageType.Spawn)
+                {
+                    var entityId = BitConverter.ToInt32(message.Payload[^4..]);
+                    var entityType = Type.GetType(Encoding.UTF8.GetString(message.Payload[..^4]));
+
+                    var entity = (NetworkEntity)Activator.CreateInstance(entityType);
+                    entity.Init(false, false, entityId, false, uint.MinValue);
+
+                    spawnedEntities.Add(entityId, entity);
+                }
+                else if (message.Type == MessageType.Destroy)
+                {
+                    var entityId = BitConverter.ToInt32(message.Payload);
+
+                    if (!spawnedEntities.Remove(entityId))
+                    {
+                        Console.WriteLine("Client tried to remove entity that was not spawned yet");
+                    }
+                }
+                else if (message.Type == MessageType.Rpc)
+                {
+                    var rpcData = NetworkMessageSerializer.Decombine<int, string>(message.Payload);
+                    var entityId = (int)rpcData[0];
+                    var rpcName = (string)rpcData[1];
+
+                    if (spawnedEntities.TryGetValue(entityId, out var entity))
+                    {
+                        var method = entity.GetType().GetMethod(rpcName);
+
+                        method.Invoke(entity, null);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Client tried to execute a rpc on a network entity that does not exist or is not in the spawnedEntities collection");
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Exception in OnMessageClient in Network.cs: \n {ex}");
+            }
+        }
+
+        private static void OnMessageServer((uint clientId, byte[] data) messageData)
+        {
+            try
+            {
+                uint clientId = messageData.clientId;
+                var message = NetworkMessageSerializer.DeserializeMessage(messageData.data);
+
+                if(message.Type == MessageType.Rpc)
+                {
+                    var rpcData = NetworkMessageSerializer.Decombine<int, string>(message.Payload);
+                    var entityId = (int)rpcData[0];
+                    var rpcName = (string)rpcData[1];
+
+                    if(spawnedEntities.TryGetValue(entityId, out var entity))
+                    {
+                        var method = entity.GetType().GetMethod(rpcName);
+
+                        if(method != null)
+                        {
+                            var attribute = method.GetCustomAttribute<RpcAttribute>();
+
+                            if (attribute != null && attribute.Target == RpcTarget.Server)
+                            {
+                                method.Invoke(entity, null);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Server tried to execute a rpc from a client that its correspodning entity did not exist \n Client is most likeley cheating!");
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Exception in OnMessageServer in Network.cs: \n {ex}");
+            }
         }
 
         public static void Stop()
         {
             NetworkManager.Stop();
+            UsedNetworkEntityIds?.Clear();
+            spawnedEntities?.Clear();
 
             State = NetworkState.Dead;
         }
@@ -41,8 +134,9 @@ namespace Core
         {
             if (State != NetworkState.Server) throw new InvalidOperationException("Tried to spawn entity on client");
 
-            string entityTypeName = typeof(T).FullName;
-            byte[] entityPayload = Encoding.ASCII.GetBytes(entityTypeName);
+            string entityTypeName = typeof(T).AssemblyQualifiedName;
+
+            byte[] entityPayload = Encoding.UTF8.GetBytes(entityTypeName);
 
             int entityId = Random.Shared.Next(int.MinValue, int.MaxValue);
             while (UsedNetworkEntityIds.Contains(entityId))
@@ -68,6 +162,7 @@ namespace Core
 
             var entity = new T();
             entity.Init(true, false, entityId, false, uint.MinValue);
+            spawnedEntities.Add(entityId, entity);
 
             return entity;
         }
@@ -93,7 +188,7 @@ namespace Core
                 NetworkManager.SendMessageServer(client.ClientId, messageBytes);
             }
 
-            //TODO: Destroy the entity locally
+            spawnedEntities.Remove(entityId);
         }
 
         internal static void CallRpc(NetworkEntity entity, string rpcName)
