@@ -5,7 +5,7 @@ VisualStudioVersion = 17.14.36301.6
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kynetic", "Kynetic.csproj", "{C321FC7F-B03D-4743-8A54-9DEEF432D004}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameCore", "..\GameCore\GameCore.csproj", "{0167986B-DDF0-4410-BE48-BDC6FBB86E9D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "..\GameCore\Core.csproj", "{0167986B-DDF0-4410-BE48-BDC6FBB86E9D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Networking", "..\Networking\Networking.csproj", "{51E77A7A-4703-42C3-917E-50E0E8E19C6D}"
 EndProject
